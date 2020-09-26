@@ -178,6 +178,7 @@ define('CALENDAR_EVENT_TYPE_ACTION', 1);
  * @property string $eventtype The event type
  * @property int $timestart The start time as a timestamp
  * @property int $timeduration The duration of the event in seconds
+ * @property int $timeusermidnight User midnight for the event
  * @property int $visible 1 if the event is visible
  * @property int $uuid ?
  * @property int $sequence ?
@@ -1280,6 +1281,12 @@ class calendar_information {
      * @param string|null $view preference view options (eg: day, month, upcoming)
      */
     public function add_sidecalendar_blocks(core_calendar_renderer $renderer, $showfilters=false, $view=null) {
+        global $PAGE;
+
+        if (!has_capability('moodle/block:view', $PAGE->context) ) {
+            return;
+        }
+
         if ($showfilters) {
             $filters = new block_contents();
             $filters->content = $renderer->event_filter();

@@ -2008,8 +2008,28 @@ function lti_calculate_custom_parameter($value) {
     switch ($value) {
         case 'Moodle.Person.userGroupIds':
             return implode(",", groups_get_user_groups($COURSE->id, $USER->id)[0]);
+        case 'Context.id.history':
+            return implode(",", get_course_history($COURSE));
     }
     return null;
+}
+
+/**
+ * Build the history chain for this course using the course originalcourseid.
+ *
+ * @param object $course course for which the history is returned.
+ *
+ * @return array ids of the source course in ancestry order, immediate parent 1st.
+ */
+function get_course_history($course) {
+    global $DB;
+    $history = [];
+    $parentid = $course->originalcourseid;
+    while (!empty($parentid) && !in_array($parentid, $history)) {
+        $history[] = $parentid;
+        $parentid = $DB->get_field('course', 'originalcourseid', array('id' => $parentid));
+    }
+    return $history;
 }
 
 /**
@@ -2388,12 +2408,12 @@ function lti_get_shared_secrets_by_key($key) {
     // Look up the shared secret for the specified key in both the types_config table (for configured tools)
     // And in the lti resource table for ad-hoc tools.
     $lti13 = LTI_VERSION_1P3;
-    $query = "SELECT t2.value
+    $query = "SELECT " . $DB->sql_compare_text('t2.value', 256) . " AS value
                 FROM {lti_types_config} t1
                 JOIN {lti_types_config} t2 ON t1.typeid = t2.typeid
                 JOIN {lti_types} type ON t2.typeid = type.id
               WHERE t1.name = 'resourcekey'
-                AND t1.value = :key1
+                AND " . $DB->sql_compare_text('t1.value', 256) . " = :key1
                 AND t2.name = 'password'
                 AND type.state = :configured1
                 AND type.ltiversion <> :ltiversion
@@ -3641,6 +3661,7 @@ function lti_get_capabilities() {
        'Context.id' => 'context_id',
        'Context.title' => 'context_title',
        'Context.label' => 'context_label',
+       'Context.id.history' => null,
        'Context.sourcedId' => 'lis_course_section_sourcedid',
        'Context.longDescription' => '$COURSE->summary',
        'Context.timeFrame.begin' => '$COURSE->startdate',
