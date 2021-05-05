@@ -403,7 +403,7 @@ function folder_dndupload_handle($uploadinfo) {
 function folder_get_coursemodule_info($cm) {
     global $DB;
     if (!($folder = $DB->get_record('folder', array('id' => $cm->instance),
-            'id, name, display, showexpanded, showdownloadfolder, intro, introformat'))) {
+            'id, name, display, showexpanded, showdownloadfolder, forcedownload, intro, introformat'))) {
         return NULL;
     }
     $cminfo = new cached_cm_info();
@@ -413,6 +413,7 @@ function folder_get_coursemodule_info($cm) {
         $fdata = new stdClass();
         $fdata->showexpanded = $folder->showexpanded;
         $fdata->showdownloadfolder = $folder->showdownloadfolder;
+        $fdata->forcedownload = $folder->forcedownload;
         if ($cm->showdescription && strlen(trim($folder->intro))) {
             $fdata->intro = $folder->intro;
             if ($folder->introformat != FORMAT_MOODLE) {
@@ -438,7 +439,7 @@ function folder_get_coursemodule_info($cm) {
  * @param cm_info $cm
  */
 function folder_cm_info_dynamic(cm_info $cm) {
-    if ($cm->customdata) {
+    if ($cm->get_custom_data()) {
         // the field 'customdata' is not empty IF AND ONLY IF we display contens inline
         $cm->set_no_view_link();
     }

@@ -419,10 +419,9 @@ function default_exception_handler($ex) {
  * @param string $errstr
  * @param string $errfile
  * @param int $errline
- * @param array $errcontext
  * @return bool false means use default error handler
  */
-function default_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
+function default_error_handler($errno, $errstr, $errfile, $errline) {
     if ($errno == 4096) {
         //fatal catchable error
         throw new coding_exception('PHP catchable fatal error', $errstr);
@@ -1498,8 +1497,9 @@ function make_unique_writable_directory($basedir, $exceptiononerror = true) {
     }
 
     do {
-        // Generate a new (hopefully unique) directory name.
-        $uniquedir = $basedir . DIRECTORY_SEPARATOR . \core\uuid::generate();
+        // Let's use uniqid() because it's "unique enough" (microtime based). The loop does handle repetitions.
+        // Windows and old PHP don't like very long paths, so try to keep this shorter. See MDL-69975.
+        $uniquedir = $basedir . DIRECTORY_SEPARATOR . uniqid();
     } while (
             // Ensure that basedir is still writable - if we do not check, we could get stuck in a loop here.
             is_writable($basedir) &&
@@ -1635,14 +1635,16 @@ function get_request_storage_directory($exceptiononerror = true, bool $forcecrea
     $createnewdirectory = $forcecreate || !$writabledirectoryexists;
 
     if ($createnewdirectory) {
-        if ($CFG->localcachedir !== "$CFG->dataroot/localcache") {
-            check_dir_exists($CFG->localcachedir, true, true);
-            protect_directory($CFG->localcachedir);
-        } else {
-            protect_directory($CFG->dataroot);
-        }
 
-        if ($dir = make_unique_writable_directory($CFG->localcachedir, $exceptiononerror)) {
+        // Let's add the first chars of siteidentifier only. This is to help separate
+        // paths on systems which host multiple moodles. We don't use the full id
+        // as Windows and old PHP don't like very long paths. See MDL-69975.
+        $basedir = $CFG->localrequestdir . '/' . substr($CFG->siteidentifier, 0, 4);
+
+        make_writable_directory($basedir);
+        protect_directory($basedir);
+
+        if ($dir = make_unique_writable_directory($basedir, $exceptiononerror)) {
             // Register a shutdown handler to remove the directory.
             \core_shutdown_manager::register_function('remove_dir', [$dir]);
         }
@@ -2045,7 +2047,7 @@ class bootstrap_renderer {
         // In the name of protocol correctness, monitoring and performance
         // profiling, set the appropriate error headers for machine consumption.
         $protocol = (isset($_SERVER['SERVER_PROTOCOL']) ? $_SERVER['SERVER_PROTOCOL'] : 'HTTP/1.0');
-        @header($protocol . ' 503 Service Unavailable');
+        @header($protocol . ' 500 Internal Server Error');
 
         // better disable any caching
         @header('Content-Type: text/html; charset=utf-8');

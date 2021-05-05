@@ -480,7 +480,7 @@ class manager {
 
             // Sort categories by order.
             uasort($categories, function($category1, $category2) {
-                return $category1->get_order() > $category2->get_order();
+                return $category1->get_order() <=> $category2->get_order();
             });
 
             static::$searchareacategories = $categories;
@@ -823,8 +823,8 @@ class manager {
             }
         }
 
-        // Add all supported block contexts, in a single query for performance.
-        if (!empty($areasbylevel[CONTEXT_BLOCK])) {
+        // Add all supported block contexts for course contexts that user can access, in a single query for performance.
+        if (!empty($areasbylevel[CONTEXT_BLOCK]) && !empty($coursecontextids)) {
             // Get list of all block types we care about.
             $blocklist = [];
             foreach ($areasbylevel[CONTEXT_BLOCK] as $areaid => $searchclass) {

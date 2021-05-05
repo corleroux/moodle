@@ -36,6 +36,10 @@ use context;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class contentbank {
+
+    /** @var array All the context levels allowed in the content bank */
+    private const ALLOWED_CONTEXT_LEVELS = [CONTEXT_SYSTEM, CONTEXT_COURSECAT, CONTEXT_COURSE];
+
     /** @var array Enabled content types. */
     private $enabledcontenttypes = null;
 
@@ -211,8 +215,7 @@ class contentbank {
 
         $records = $DB->get_records_select('contentbank_content', $sql, $params, 'name ASC');
         foreach ($records as $record) {
-            $contentclass = "\\$record->contenttype\\content";
-            $content = new $contentclass($record);
+            $content = $this->get_content_from_id($record->id);
             if ($content->is_view_allowed()) {
                 $contents[] = $content;
             }
@@ -263,14 +266,10 @@ class contentbank {
         $result = true;
         $records = $DB->get_records('contentbank_content', ['contextid' => $context->id]);
         foreach ($records as $record) {
-            $contenttypeclass = "\\$record->contenttype\\contenttype";
-            if (class_exists($contenttypeclass)) {
-                $contenttype = new $contenttypeclass($context);
-                $contentclass = "\\$record->contenttype\\content";
-                $content = new $contentclass($record);
-                if (!$contenttype->delete_content($content)) {
-                    $result = false;
-                }
+            $content = $this->get_content_from_id($record->id);
+            $contenttype = $content->get_content_type_instance();
+            if (!$contenttype->delete_content($content)) {
+                $result = false;
             }
         }
         return $result;
@@ -289,14 +288,10 @@ class contentbank {
         $result = true;
         $records = $DB->get_records('contentbank_content', ['contextid' => $from->id]);
         foreach ($records as $record) {
-            $contenttypeclass = "\\$record->contenttype\\contenttype";
-            if (class_exists($contenttypeclass)) {
-                $contenttype = new $contenttypeclass($from);
-                $contentclass = "\\$record->contenttype\\content";
-                $content = new $contentclass($record);
-                if (!$contenttype->move_content($content, $to)) {
-                    $result = false;
-                }
+            $content = $this->get_content_from_id($record->id);
+            $contenttype = $content->get_content_type_instance();
+            if (!$contenttype->move_content($content, $to)) {
+                $result = false;
             }
         }
         return $result;
@@ -347,5 +342,15 @@ class contentbank {
         $record = $DB->get_record('contentbank_content', ['id' => $id], '*', MUST_EXIST);
         $contentclass = "\\$record->contenttype\\content";
         return new $contentclass($record);
+    }
+
+    /**
+     * Whether the context is allowed.
+     *
+     * @param context $context Context to check.
+     * @return bool
+     */
+    public function is_context_allowed(context $context): bool {
+        return in_array($context->contextlevel, self::ALLOWED_CONTEXT_LEVELS);
     }
 }

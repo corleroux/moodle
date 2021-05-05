@@ -39,7 +39,7 @@ class core_badges_renderer extends plugin_renderer_base {
             if (!$external) {
                 $context = ($badge->type == BADGE_TYPE_SITE) ? context_system::instance() : context_course::instance($badge->courseid);
                 $bname = $badge->name;
-                $imageurl = moodle_url::make_pluginfile_url($context->id, 'badges', 'badgeimage', $badge->id, '/', 'f1', false);
+                $imageurl = moodle_url::make_pluginfile_url($context->id, 'badges', 'badgeimage', $badge->id, '/', 'f3', false);
             } else {
                 $bname = '';
                 $imageurl = '';
@@ -80,20 +80,17 @@ class core_badges_renderer extends plugin_renderer_base {
                     $params
                 );
                 $notexpiredbadge = (empty($badge->dateexpire) || $badge->dateexpire > time());
-                $backpackexists = badges_user_has_backpack($USER->id);
-                if (!empty($CFG->badges_allowexternalbackpack) && $notexpiredbadge && $backpackexists) {
+                $userbackpack = badges_get_user_backpack();
+                if (!empty($CFG->badges_allowexternalbackpack) && $notexpiredbadge && $userbackpack) {
                     $assertion = new moodle_url('/badges/assertion.php', array('b' => $badge->uniquehash));
-                    $action = null;
-                    if (badges_open_badges_backpack_api() == OPEN_BADGES_V1) {
-                        $action = new component_action('click', 'addtobackpack', array('assertion' => $assertion->out(false)));
-                        $addurl = new moodle_url('#');
-                    } else if (badges_open_badges_backpack_api() == OPEN_BADGES_V2P1) {
-                        $addurl = new moodle_url('/badges/backpack-export.php', array('hash' => $badge->uniquehash));
-                    } else {
-                        $addurl = new moodle_url('/badges/backpack-add.php', array('hash' => $badge->uniquehash));
-                    }
                     $icon = new pix_icon('t/backpack', get_string('addtobackpack', 'badges'));
-                    $push = $this->output->action_icon($addurl, $icon, $action);
+                    if (badges_open_badges_backpack_api($userbackpack->id) == OPEN_BADGES_V2) {
+                        $addurl = new moodle_url('/badges/backpack-add.php', array('hash' => $badge->uniquehash));
+                        $push = $this->output->action_icon($addurl, $icon);
+                    } else if (badges_open_badges_backpack_api($userbackpack->id) == OPEN_BADGES_V2P1) {
+                        $addurl = new moodle_url('/badges/backpack-export.php', array('hash' => $badge->uniquehash));
+                        $push = $this->output->action_icon($addurl, $icon);
+                    }
                 }
 
                 $download = $this->output->action_icon($url, new pix_icon('t/download', get_string('download')));
@@ -322,7 +319,15 @@ class core_badges_renderer extends plugin_renderer_base {
         $badgeclass = $ibadge->badgeclass;
         $badge = new badge($ibadge->badgeid);
         $now = time();
-        $expiration = isset($issued['expires']) ? $issued['expires'] : $now + 86400;
+        if (isset($issued['expires'])) {
+            if (!is_numeric($issued['expires'])) {
+                $issued['expires'] = strtotime($issued['expires']);
+            }
+            $expiration = $issued['expires'];
+        } else {
+            $expiration = $now + 86400;
+        }
+
         $badgeimage = is_array($badgeclass['image']) ? $badgeclass['image']['id'] : $badgeclass['image'];
         $languages = get_string_manager()->get_list_of_languages();
 
@@ -342,29 +347,18 @@ class core_badges_renderer extends plugin_renderer_base {
                         new moodle_url('/badges/badge.php', array('hash' => $ibadge->hash, 'bake' => true)),
                         get_string('download'),
                         'POST');
-            if (!empty($CFG->badges_allowexternalbackpack) && ($expiration > $now) && badges_user_has_backpack($USER->id)) {
+            if (!empty($CFG->badges_allowexternalbackpack) && ($expiration > $now)
+                && $userbackpack = badges_get_user_backpack($USER->id)) {
 
-                if (badges_open_badges_backpack_api() == OPEN_BADGES_V1) {
-                    $assertion = new moodle_url('/badges/assertion.php', array('b' => $ibadge->hash));
-                    $action = new component_action('click', 'addtobackpack', array('assertion' => $assertion->out(false)));
-                    $attributes = array(
-                            'type'  => 'button',
-                            'class' => 'btn btn-secondary m-1',
-                            'id'    => 'addbutton',
-                            'value' => get_string('addtobackpack', 'badges'));
-                    $tobackpack = html_writer::tag('input', '', $attributes);
-                    $this->output->add_action_handler($action, 'addbutton');
-                    $output .= $tobackpack;
+                if (badges_open_badges_backpack_api($userbackpack->id) == OPEN_BADGES_V2P1) {
+                    $assertion = new moodle_url('/badges/backpack-export.php', array('hash' => $ibadge->hash));
                 } else {
-                    if (badges_open_badges_backpack_api() == OPEN_BADGES_V2P1) {
-                        $assertion = new moodle_url('/badges/backpack-export.php', array('hash' => $ibadge->hash));
-                    } else {
-                        $assertion = new moodle_url('/badges/backpack-add.php', array('hash' => $ibadge->hash));
-                    }
-                    $attributes = ['class' => 'btn btn-secondary m-1', 'role' => 'button'];
-                    $tobackpack = html_writer::link($assertion, get_string('addtobackpack', 'badges'), $attributes);
-                    $output .= $tobackpack;
+                    $assertion = new moodle_url('/badges/backpack-add.php', array('hash' => $ibadge->hash));
                 }
+
+                $attributes = ['class' => 'btn btn-secondary m-1', 'role' => 'button'];
+                $tobackpack = html_writer::link($assertion, get_string('addtobackpack', 'badges'), $attributes);
+                $output .= $tobackpack;
             }
         }
         $output .= html_writer::end_tag('div');
@@ -431,9 +425,6 @@ class core_badges_renderer extends plugin_renderer_base {
         }
         $dl[get_string('dateawarded', 'badges')] = userdate($issued['issuedOn']);
         if (isset($issued['expires'])) {
-            if (!is_numeric($issued['expires'])) {
-                $issued['expires'] = strtotime($issued['expires']);
-            }
             if ($issued['expires'] < $now) {
                 $dl[get_string('expirydate', 'badges')] = userdate($issued['expires']) . get_string('warnexpired', 'badges');
 
@@ -650,10 +641,6 @@ class core_badges_renderer extends plugin_renderer_base {
             $externalhtml .= html_writer::start_tag('div', array('class' => 'generalbox'));
             $externalhtml .= $this->output->heading_with_help(get_string('externalbadges', 'badges'), 'externalbadges', 'badges');
             if (!is_null($backpack)) {
-                if ($backpack->backpackid != $CFG->badges_site_backpack) {
-                    $externalhtml .= $this->output->notification(get_string('backpackneedsupdate', 'badges'), 'warning');
-
-                }
                 if ($backpack->totalcollections == 0) {
                     $externalhtml .= get_string('nobackpackcollectionssummary', 'badges', $backpack);
                 } else {
@@ -808,7 +795,7 @@ class core_badges_renderer extends plugin_renderer_base {
                 );
 
         if (has_capability('moodle/badges:configuredetails', $context)) {
-            $row[] = new tabobject('details',
+            $row[] = new tabobject('badge',
                         new moodle_url('/badges/edit.php', array('id' => $badgeid, 'action' => 'badge')),
                         get_string('bdetails', 'badges')
                     );
@@ -859,7 +846,7 @@ class core_badges_renderer extends plugin_renderer_base {
         if (has_capability('moodle/badges:configuredetails', $context)) {
             $alignments = $DB->count_records_sql("SELECT COUNT(bc.id)
                       FROM {badge_alignment} bc WHERE bc.badgeid = :badgeid", array('badgeid' => $badgeid));
-            $row[] = new tabobject('balignment',
+            $row[] = new tabobject('alignment',
                 new moodle_url('/badges/alignment.php', array('id' => $badgeid)),
                 get_string('balignment', 'badges', $alignments)
             );

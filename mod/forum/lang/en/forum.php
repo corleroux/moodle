@@ -23,6 +23,7 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+$string['activitydate:due'] = 'Due:';
 $string['activityoverview'] = 'There are new forum posts';
 $string['actionsforgraderinterface'] = 'Actions for the grader interface';
 $string['actionsforpost'] = 'Actions for post';
@@ -104,6 +105,9 @@ $string['clicktounfavourite'] = 'You have starred this discussion. Click to unst
 $string['clicktofavourite'] = 'You have not starred this discussion. Click to star.';
 $string['close'] = 'Close';
 $string['closegrader'] = 'Close grader';
+$string['completiondetail:discussions'] = 'Start discussions: {$a}';
+$string['completiondetail:replies'] = 'Post replies: {$a}';
+$string['completiondetail:posts'] = 'Make forum posts: {$a}';
 $string['completiondiscussions'] = 'Student must create discussions:';
 $string['completiondiscussionsdesc'] = 'Student must create at least {$a} discussion(s)';
 $string['completiondiscussionsgroup'] = 'Require discussions';
@@ -762,8 +766,8 @@ $string['gradeforwholeforum'] = 'Grade for forum: {$a->str_long_grade}';
 $string['grading'] = 'Grading';
 $string['gradingstatus'] = 'Grade status:';
 $string['gradeforwholeforumhidden'] = 'Grade for forum hidden';
-$string['gradeitemnameforwholeforum'] = 'Whole forum grade for {$a->name}';
-$string['gradeitemnameforrating'] = 'Rating grade for {$a->name}';
+$string['gradeitemnameforwholeforum'] = '{$a->name} whole forum';
+$string['gradeitemnameforrating'] = '{$a->name} rating';
 $string['grades:gradesavedfor'] = 'Grade saved for {$a->fullname}';
 $string['grades:gradesavefailed'] = 'Unable to save grade for {$a->fullname}: {$a->error}';
 $string['notgraded'] = 'Not graded';

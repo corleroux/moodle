@@ -105,8 +105,11 @@ class player {
      * @param stdClass $config Configuration for H5P buttons.
      * @param bool $preventredirect Set to true in scripts that can not redirect (CLI, RSS feeds, etc.), throws exceptions
      * @param string $component optional moodle component to sent xAPI tracking
+     * @param bool $skipcapcheck Whether capabilities should be checked or not to get the pluginfile URL because sometimes they
+     *     might be controlled before calling this method.
      */
-    public function __construct(string $url, \stdClass $config, bool $preventredirect = true, string $component = '') {
+    public function __construct(string $url, \stdClass $config, bool $preventredirect = true, string $component = '',
+            bool $skipcapcheck = false) {
         if (empty($url)) {
             throw new \moodle_exception('h5pinvalidurl', 'core_h5p');
         }
@@ -127,7 +130,9 @@ class player {
             $url,
             $config,
             $this->factory,
-            $this->messages
+            $this->messages,
+            $this->preventredirect,
+            $skipcapcheck
         );
         if ($file) {
             $this->context = \context::instance_by_id($file->get_contextid());
@@ -353,11 +358,14 @@ class player {
         $settings['moodleLibraryPaths'] = $this->core->get_dependency_roots($this->h5pid);
         // Add also the Moodle component where the results will be tracked.
         $settings['moodleComponent'] = $this->component;
+        if (!empty($settings['moodleComponent'])) {
+            $settings['reportingIsEnabled'] = true;
+        }
 
         $cid = $this->get_cid();
         // The filterParameters function should be called before getting the dependencyfiles because it rebuild content
         // dependency cache and export file.
-        $settings['contents'][$cid]['jsonContent'] = $this->core->filterParameters($this->content);
+        $settings['contents'][$cid]['jsonContent'] = $this->get_filtered_parameters();
 
         $files = $this->get_dependency_files();
         if ($this->embedtype === 'div') {
@@ -399,13 +407,42 @@ class player {
     }
 
     /**
+     * Get filtered parameters, modifying them by the renderer if the theme implements the h5p_alter_filtered_parameters function.
+     *
+     * @return string Filtered parameters.
+     */
+    private function get_filtered_parameters(): string {
+        global $PAGE;
+
+        $safeparams = $this->core->filterParameters($this->content);
+        $decodedparams = json_decode($safeparams);
+        $h5poutput = $PAGE->get_renderer('core_h5p');
+        $h5poutput->h5p_alter_filtered_parameters(
+            $decodedparams,
+            $this->content['library']['name'],
+            $this->content['library']['majorVersion'],
+            $this->content['library']['minorVersion']
+        );
+        $safeparams = json_encode($decodedparams);
+
+        return $safeparams;
+    }
+
+    /**
      * Finds library dependencies of view
      *
      * @return array Files that the view has dependencies to
      */
     private function get_dependency_files(): array {
+        global $PAGE;
+
         $preloadeddeps = $this->core->loadContentDependencies($this->h5pid, 'preloaded');
         $files = $this->core->getDependenciesFiles($preloadeddeps);
+
+        // Add additional asset files if required.
+        $h5poutput = $PAGE->get_renderer('core_h5p');
+        $h5poutput->h5p_alter_scripts($files['scripts'], $preloadeddeps, $this->embedtype);
+        $h5poutput->h5p_alter_styles($files['styles'], $preloadeddeps, $this->embedtype);
 
         return $files;
     }

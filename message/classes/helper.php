@@ -429,7 +429,8 @@ class helper {
         }
 
         list($useridsql, $usersparams) = $DB->get_in_or_equal($userids);
-        $userfields = \user_picture::fields('u', array('lastaccess'));
+        $userfieldsapi = \core_user\fields::for_userpic()->including('lastaccess');
+        $userfields = $userfieldsapi->get_sql('u', false, '', '', false)->selects;
         $userssql = "SELECT $userfields, u.deleted, mc.id AS contactid, mub.id AS blockedid
                        FROM {user} u
                   LEFT JOIN {message_contacts} mc
@@ -622,7 +623,8 @@ class helper {
                 'notification' => $notification
             ],
             'isdrawer' => $isdrawer,
-            'showemojipicker' => !empty($CFG->allowemojipicker)
+            'showemojipicker' => !empty($CFG->allowemojipicker),
+            'messagemaxlength' => api::MESSAGE_MAX_LENGTH,
         ];
 
         if ($sendtouser || $conversationid) {

@@ -37,7 +37,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
     /**
      * Tests set up
      */
-    protected function setUp() {
+    protected function setUp(): void {
         global $CFG;
 
         require_once($CFG->dirroot . '/message/lib.php');
@@ -153,6 +153,41 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $this->assertEquals($themessage->useridto, $message1['touserid']);
         $this->assertEquals($themessage->smallmessage, $message1['text']);
         $this->assertEquals($sentmessage['clientmsgid'], $message1['clientmsgid']);
+    }
+
+    /**
+     * Test send_instant_messages with a message text longer than permitted.
+     */
+    public function test_send_instant_messages_long_text() {
+        global $CFG;
+
+        $this->resetAfterTest(true);
+
+        // Transactions used in tests, tell phpunit use alternative reset method.
+        $this->preventResetByRollback();
+
+        $user1 = self::getDataGenerator()->create_user();
+        $user2 = self::getDataGenerator()->create_user();
+
+        $this->setUser($user1);
+
+        // Create test message data.
+        $message1 = [
+            'touserid' => $user2->id,
+            'text' => str_repeat("M", \core_message\api::MESSAGE_MAX_LENGTH + 100),
+            'clientmsgid' => 4,
+        ];
+        $messages = [$message1];
+
+        // Add the user1 as a contact.
+        \core_message\api::add_contact($user1->id, $user2->id);
+
+        $sentmessages = core_message_external::send_instant_messages($messages);
+        $sentmessages = external_api::clean_returnvalue(core_message_external::send_instant_messages_returns(), $sentmessages);
+        $this->assertEquals(
+            get_string('errormessagetoolong', 'message'),
+            array_pop($sentmessages)['errormessage']
+        );
     }
 
     /**
@@ -1188,7 +1223,6 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
 
     /**
      * Test search_contacts.
-     * @expectedException moodle_exception
      */
     public function test_search_contacts() {
         global $DB;
@@ -1250,6 +1284,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $this->assertEquals($user5->id, $result['id']);
 
         // Empty query, will throw an exception.
+        $this->expectException(moodle_exception::class);
         $results = core_message_external::search_contacts('');
     }
 
@@ -2056,7 +2091,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $this->assertCount(2, $contacts[0]['conversations']);
         // We can't rely on the ordering of conversations within the results, so sort by id first.
         usort($contacts[0]['conversations'], function($a, $b) {
-            return $a['id'] < $b['id'];
+            return $b['id'] <=> $a['id'];
         });
         $this->assertEquals(\core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP, $contacts[0]['conversations'][0]['type']);
         $this->assertEquals(\core_message\api::MESSAGE_CONVERSATION_TYPE_INDIVIDUAL, $contacts[0]['conversations'][1]['type']);
@@ -2152,7 +2187,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $this->assertCount(2, $contacts[0]['conversations']);
         // We can't rely on the ordering of conversations within the results, so sort by id first.
         usort($contacts[0]['conversations'], function($a, $b) {
-            return $a['id'] < $b['id'];
+            return $b['id'] <=> $a['id'];
         });
         $this->assertEquals(\core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP, $contacts[0]['conversations'][0]['type']);
         $this->assertEquals(\core_message\api::MESSAGE_CONVERSATION_TYPE_INDIVIDUAL, $contacts[0]['conversations'][1]['type']);
@@ -2793,14 +2828,14 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $members = $result['members'];
         $this->assertCount(3, $members);
         $membersid = [$members[0]['id'], $members[1]['id'], $members[2]['id']];
-        $this->assertContains($user1->id, $membersid);
-        $this->assertContains($user2->id, $membersid);
-        $this->assertContains($user3->id, $membersid);
+        $this->assertContainsEquals($user1->id, $membersid);
+        $this->assertContainsEquals($user2->id, $membersid);
+        $this->assertContainsEquals($user3->id, $membersid);
 
         $membersfullnames = [$members[0]['fullname'], $members[1]['fullname'], $members[2]['fullname']];
-        $this->assertContains(fullname($user1), $membersfullnames);
-        $this->assertContains(fullname($user2), $membersfullnames);
-        $this->assertContains(fullname($user3), $membersfullnames);
+        $this->assertContainsEquals(fullname($user1), $membersfullnames);
+        $this->assertContainsEquals(fullname($user2), $membersfullnames);
+        $this->assertContainsEquals(fullname($user3), $membersfullnames);
 
         // Confirm the messages data is correct.
         $messages = $result['messages'];
@@ -2812,16 +2847,16 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $message4 = $messages[3];
 
         $this->assertEquals($user1->id, $message1['useridfrom']);
-        $this->assertContains('Yo!', $message1['text']);
+        $this->assertStringContainsString('Yo!', $message1['text']);
 
         $this->assertEquals($user3->id, $message2['useridfrom']);
-        $this->assertContains('Sup mang?', $message2['text']);
+        $this->assertStringContainsString('Sup mang?', $message2['text']);
 
         $this->assertEquals($user2->id, $message3['useridfrom']);
-        $this->assertContains('Writing PHPUnit tests!', $message3['text']);
+        $this->assertStringContainsString('Writing PHPUnit tests!', $message3['text']);
 
         $this->assertEquals($user1->id, $message4['useridfrom']);
-        $this->assertContains('Word.', $message4['text']);
+        $this->assertStringContainsString('Word.', $message4['text']);
     }
 
     /**
@@ -2870,9 +2905,9 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $message2 = $messages[1];
         $message3 = $messages[2];
 
-        $this->assertContains('Message 2', $message1['text']);
-        $this->assertContains('Message 3', $message2['text']);
-        $this->assertContains('Message 4', $message3['text']);
+        $this->assertStringContainsString('Message 2', $message1['text']);
+        $this->assertStringContainsString('Message 3', $message2['text']);
+        $this->assertStringContainsString('Message 4', $message3['text']);
 
         // Confirm the members data is correct.
         $members = $result['members'];
@@ -2922,9 +2957,9 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $members = $result['members'];
         $this->assertCount(3, $members);
         $membersid = [$members[0]['id'], $members[1]['id'], $members[2]['id']];
-        $this->assertContains($user1->id, $membersid);
-        $this->assertContains($user2->id, $membersid);
-        $this->assertContains($user3->id, $membersid);
+        $this->assertContainsEquals($user1->id, $membersid);
+        $this->assertContainsEquals($user2->id, $membersid);
+        $this->assertContainsEquals($user3->id, $membersid);
 
         // Confirm the message data is correct.
         $messages = $result['messages'];
@@ -2936,16 +2971,16 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $message4 = $messages[3];
 
         $this->assertEquals($user1->id, $message1['useridfrom']);
-        $this->assertContains('Yo!', $message1['text']);
+        $this->assertStringContainsString('Yo!', $message1['text']);
 
         $this->assertEquals($user3->id, $message2['useridfrom']);
-        $this->assertContains('Sup mang?', $message2['text']);
+        $this->assertStringContainsString('Sup mang?', $message2['text']);
 
         $this->assertEquals($user2->id, $message3['useridfrom']);
-        $this->assertContains('Writing PHPUnit tests!', $message3['text']);
+        $this->assertStringContainsString('Writing PHPUnit tests!', $message3['text']);
 
         $this->assertEquals($user1->id, $message4['useridfrom']);
-        $this->assertContains('Word.', $message4['text']);
+        $this->assertStringContainsString('Word.', $message4['text']);
     }
 
     /**
@@ -3503,7 +3538,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
      * @return bool
      */
     protected static function sort_contacts($a, $b) {
-        return $a['userid'] > $b['userid'];
+        return $a['userid'] <=> $b['userid'];
     }
 
     /**
@@ -3514,7 +3549,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
      * @return bool
      */
     protected static function sort_contacts_id($a, $b) {
-        return $a['id'] > $b['id'];
+        return $a['id'] <=> $b['id'];
     }
 
     /**
@@ -4243,6 +4278,54 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
     }
 
     /**
+     * Test that group conversations containing MathJax don't break the WebService.
+     */
+    public function test_get_conversations_group_with_mathjax() {
+        $this->resetAfterTest(true);
+        $this->setAdminUser();
+
+        // Enable MathJax filter in content and headings.
+        $this->configure_filters([
+            ['name' => 'mathjaxloader', 'state' => TEXTFILTER_ON, 'move' => -1, 'applytostrings' => true],
+        ]);
+
+        // Create some users, a course and a group with a linked conversation.
+        $user1 = self::getDataGenerator()->create_user();
+        $user2 = self::getDataGenerator()->create_user();
+
+        $coursename = 'Course $$(a+b)=2$$';
+        $groupname = 'Group $$(a+b)=2$$';
+        $course1 = $this->getDataGenerator()->create_course(['shortname' => $coursename]);
+
+        $this->getDataGenerator()->enrol_user($user1->id, $course1->id);
+        $this->getDataGenerator()->enrol_user($user2->id, $course1->id);
+        $group1 = $this->getDataGenerator()->create_group([
+            'name' => $groupname,
+            'courseid' => $course1->id,
+            'enablemessaging' => 1,
+        ]);
+
+        // Add users to group1.
+        $this->getDataGenerator()->create_group_member(array('groupid' => $group1->id, 'userid' => $user1->id));
+        $this->getDataGenerator()->create_group_member(array('groupid' => $group1->id, 'userid' => $user2->id));
+
+        // Call the WebService.
+        $result = core_message_external::get_conversations($user1->id, 0, 20, null, false);
+        $result = external_api::clean_returnvalue(core_message_external::get_conversations_returns(), $result);
+        $conversations = $result['conversations'];
+
+        // Format original data.
+        $coursecontext = \context_course::instance($course1->id);
+        $coursename = external_format_string($coursename, $coursecontext->id);
+        $groupname = external_format_string($groupname, $coursecontext->id);
+
+        $this->assertStringContainsString('<span class="filter_mathjaxloader_equation">', $conversations[0]['name']);
+        $this->assertStringContainsString('<span class="filter_mathjaxloader_equation">', $conversations[0]['subname']);
+        $this->assertEquals($groupname, $conversations[0]['name']);
+        $this->assertEquals($coursename, $conversations[0]['subname']);
+    }
+
+    /**
      * Test verifying get_conversations when there are users in a group and/or individual conversation. The reason this
      * test is performed is because we do not need as much data for group conversations (saving DB calls), so we want
      * to confirm this happens.
@@ -4339,7 +4422,7 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $conversations = $result['conversations'];
 
         usort($conversations, function($first, $second){
-            return $first['id'] > $second['id'];
+            return $first['id'] <=> $second['id'];
         });
 
         $selfconversation = array_shift($conversations);
@@ -4748,6 +4831,38 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         ];
         $this->expectException(\moodle_exception::class);
         $writtenmessages = core_message_external::send_messages_to_conversation($gc1->id, $messages);
+    }
+
+    /**
+     * Test verifying a to long message can not be sent to a conversation.
+     */
+    public function test_send_messages_to_conversation_long_text() {
+        $this->resetAfterTest(true);
+
+        // Get a bunch of conversations, some group, some individual and in different states.
+        list($user1, $user2, $user3, $user4, $ic1, $ic2, $ic3,
+            $gc1, $gc2, $gc3, $gc4, $gc5, $gc6) = $this->create_conversation_test_data();
+
+        // Enrol the users in the same course, so the default privacy controls (course + contacts) can be used.
+        $course1 = $this->getDataGenerator()->create_course();
+        $this->getDataGenerator()->enrol_user($user1->id, $course1->id);
+        $this->getDataGenerator()->enrol_user($user2->id, $course1->id);
+        $this->getDataGenerator()->enrol_user($user3->id, $course1->id);
+        $this->getDataGenerator()->enrol_user($user4->id, $course1->id);
+
+        // The user making the request.
+        $this->setUser($user1);
+
+        // Try to send a message as user1 to a conversation user1 is a a part of.
+        $messages = [
+            [
+                'text' => str_repeat("M", \core_message\api::MESSAGE_MAX_LENGTH + 100),
+                'textformat' => FORMAT_MOODLE
+            ],
+        ];
+
+        $this->expectException(moodle_exception::class);
+        $writtenmessages = core_message_external::send_messages_to_conversation($gc2->id, $messages);
     }
 
     /**
@@ -5677,6 +5792,52 @@ class core_message_externallib_testcase extends externallib_advanced_testcase {
         $this->expectException('moodle_exception');
         $this->expectExceptionMessage('You do not have permission to delete this message for everyone.');
         core_message_external::delete_message_for_all_users($messageid, $user1->id);
+    }
+
+    /**
+     * Test retrieving conversation messages by providing a timefrom higher than last message timecreated. It should return no
+     * messages but keep the return structure to not break when called from the ws.
+     */
+    public function test_get_conversation_messages_timefrom_higher_than_last_timecreated() {
+        $this->resetAfterTest(true);
+
+        // Create some users.
+        $user1 = self::getDataGenerator()->create_user();
+        $user2 = self::getDataGenerator()->create_user();
+        $user3 = self::getDataGenerator()->create_user();
+        $user4 = self::getDataGenerator()->create_user();
+
+        // Create group conversation.
+        $conversation = \core_message\api::create_conversation(
+            \core_message\api::MESSAGE_CONVERSATION_TYPE_GROUP,
+            [$user1->id, $user2->id, $user3->id, $user4->id]
+        );
+
+        // The person asking for the messages for another user.
+        $this->setUser($user1);
+
+        // Send some messages back and forth.
+        $time = 1;
+        testhelper::send_fake_message_to_conversation($user1, $conversation->id, 'Message 1', $time + 1);
+        testhelper::send_fake_message_to_conversation($user2, $conversation->id, 'Message 2', $time + 2);
+        testhelper::send_fake_message_to_conversation($user1, $conversation->id, 'Message 3', $time + 3);
+        testhelper::send_fake_message_to_conversation($user3, $conversation->id, 'Message 4', $time + 4);
+
+        // Retrieve the messages.
+        $result = core_message_external::get_conversation_messages($user1->id, $conversation->id, 0, 0, '', $time + 5);
+
+        // We need to execute the return values cleaning process to simulate the web service server.
+        $result = external_api::clean_returnvalue(core_message_external::get_conversation_messages_returns(), $result);
+
+        // Check the results are correct.
+        $this->assertEquals($conversation->id, $result['id']);
+
+        // Confirm the message data is correct.
+        $messages = $result['messages'];
+        $this->assertEquals(0, count($messages));
+
+        // Confirm that members key is present.
+        $this->assertArrayHasKey('members', $result);
     }
 
     /**

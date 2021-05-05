@@ -476,4 +476,21 @@ $definitions = array(
         'simplekeys' => true,
         'simpledata' => false,
     ],
+
+    // Cache the grade setting for faster retrieval.
+    'gradesetting' => [
+        'mode'                   => cache_store::MODE_REQUEST,
+        'simplekeys'             => true,
+        'staticacceleration'     => true,
+        'staticaccelerationsize' => 100
+    ],
+
+    // Course image cache.
+    'course_image' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'simpledata' => true,
+        'staticacceleration' => true,
+        'datasource' => '\core_course\cache\course_image',
+    ],
 );

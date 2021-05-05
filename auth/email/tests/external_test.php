@@ -43,19 +43,18 @@ class auth_email_external_testcase extends externallib_advanced_testcase {
     /**
      * Set up for every test
      */
-    public function setUp() {
-        global $CFG, $DB;
+    public function setUp(): void {
+        global $CFG;
 
         $this->resetAfterTest(true);
         $CFG->registerauth = 'email';
 
-        $categoryid = $DB->insert_record('user_info_category', array('name' => 'Cat 1', 'sortorder' => 1));
-        $this->field1 = $DB->insert_record('user_info_field', array(
-                'shortname' => 'frogname', 'name' => 'Name of frog', 'categoryid' => $categoryid,
-                'datatype' => 'text', 'signup' => 1, 'visible' => 1, 'required' => 1, 'sortorder' => 1));
-        $this->field2 = $DB->insert_record('user_info_field', array(
-                'shortname' => 'sometext', 'name' => 'Some text in textarea', 'categoryid' => $categoryid,
-                'datatype' => 'textarea', 'signup' => 1, 'visible' => 1, 'required' => 1, 'sortorder' => 2));
+        $this->field1 = $this->getDataGenerator()->create_custom_profile_field(array(
+                'shortname' => 'frogname', 'name' => 'Name of frog',
+                'datatype' => 'text', 'signup' => 1, 'visible' => 1, 'required' => 1, 'sortorder' => 1))->id;
+        $this->field2 = $this->getDataGenerator()->create_custom_profile_field(array(
+                'shortname' => 'sometext', 'name' => 'Some text in textarea',
+                'datatype' => 'textarea', 'signup' => 1, 'visible' => 1, 'required' => 1, 'sortorder' => 2))->id;
     }
 
     public function test_get_signup_settings() {
@@ -91,6 +90,51 @@ class auth_email_external_testcase extends externallib_advanced_testcase {
 
         $this->assertEquals('text', $namedarray['frogname']['datatype']);
         $this->assertEquals('textarea', $namedarray['sometext']['datatype']);
+    }
+
+    /**
+     * Test get_signup_settings with mathjax in a profile field.
+     */
+    public function test_get_signup_settings_with_mathjax_in_profile_fields() {
+        global $CFG, $DB;
+
+        require_once($CFG->dirroot . '/lib/externallib.php');
+
+        // Enable MathJax filter in content and headings.
+        $this->configure_filters([
+            ['name' => 'mathjaxloader', 'state' => TEXTFILTER_ON, 'move' => -1, 'applytostrings' => true],
+        ]);
+
+        // Create category with MathJax and a new field with MathJax.
+        $categoryname = 'Cat $$(a+b)=2$$';
+        $fieldname = 'Some text $$(a+b)=2$$';
+        $categoryid = $this->getDataGenerator()->create_custom_profile_field_category(['name' => $categoryname])->id;
+        $this->getDataGenerator()->create_custom_profile_field(array(
+                'shortname' => 'mathjaxname', 'name' => $fieldname, 'categoryid' => $categoryid,
+                'datatype' => 'textarea', 'signup' => 1, 'visible' => 1, 'required' => 1, 'sortorder' => 2));
+
+        $result = auth_email_external::get_signup_settings();
+        $result = external_api::clean_returnvalue(auth_email_external::get_signup_settings_returns(), $result);
+
+        // Format the original data.
+        $sitecontext = context_system::instance();
+        $categoryname = external_format_string($categoryname, $sitecontext->id);
+        $fieldname = external_format_string($fieldname, $sitecontext->id);
+
+        // Whip up a array with named entries to easily check against.
+        $namedarray = array();
+        foreach ($result['profilefields'] as $key => $value) {
+            $namedarray[$value['shortname']] = $value;
+        }
+
+        // Check the new profile field.
+        $this->assertArrayHasKey('mathjaxname', $namedarray);
+        $this->assertStringContainsString('<span class="filter_mathjaxloader_equation">',
+                $namedarray['mathjaxname']['categoryname']);
+        $this->assertStringContainsString('<span class="filter_mathjaxloader_equation">',
+                $namedarray['mathjaxname']['name']);
+        $this->assertEquals($categoryname, $namedarray['mathjaxname']['categoryname']);
+        $this->assertEquals($fieldname, $namedarray['mathjaxname']['name']);
     }
 
     public function test_signup_user() {

@@ -1033,7 +1033,8 @@ class core_course_category implements renderable, cacheable_object, IteratorAggr
         list($sql2, $params2) = $DB->get_in_or_equal($managerroles, SQL_PARAMS_NAMED, 'rid');
         list($sort, $sortparams) = users_order_by_sql('u');
         $notdeleted = array('notdeleted' => 0);
-        $allnames = get_all_user_name_fields(true, 'u');
+        $userfieldsapi = \core_user\fields::for_name();
+        $allnames = $userfieldsapi->get_sql('u', false, '', '', false)->selects;
         $sql = "SELECT ra.contextid, ra.id AS raid,
                        r.id AS roleid, r.name AS rolename, r.shortname AS roleshortname,
                        rn.name AS rolecoursealias, u.id, u.username, $allnames
@@ -2319,7 +2320,8 @@ class core_course_category implements renderable, cacheable_object, IteratorAggr
         $context->update_moved($newparent);
 
         // Now make it last in new category.
-        $DB->set_field('course_categories', 'sortorder', MAX_COURSES_IN_CATEGORY * MAX_COURSE_CATEGORIES, ['id' => $this->id]);
+        $DB->set_field('course_categories', 'sortorder',
+            get_max_courses_in_category() * MAX_COURSE_CATEGORIES, ['id' => $this->id]);
 
         if ($hidecat) {
             fix_course_sortorder();

@@ -379,6 +379,8 @@ abstract class moodleform_mod extends moodleform {
 
         // Freeze admin defaults if required (and not different from default)
         $this->apply_admin_locked_flags();
+
+        $this->plugin_extend_coursemodule_definition_after_data();
     }
 
     // form verification
@@ -897,6 +899,18 @@ abstract class moodleform_mod extends moodleform {
     }
 
     /**
+     * Plugins can extend the coursemodule settings form after the data is set.
+     */
+    protected function plugin_extend_coursemodule_definition_after_data() {
+        $callbacks = get_plugins_with_function('coursemodule_definition_after_data', 'lib.php');
+        foreach ($callbacks as $type => $plugins) {
+            foreach ($plugins as $plugin => $pluginfunction) {
+                $pluginfunction($this, $this->_form);
+            }
+        }
+    }
+
+    /**
      * Can be overridden to add custom completion rules if the module wishes
      * them. If overriding this, you should also override completion_rule_enabled.
      * <p>
@@ -981,7 +995,7 @@ abstract class moodleform_mod extends moodleform {
 
         if ($this->_features->hasgrades) {
             if ($this->_features->gradecat) {
-                $mform->addElement('header', 'modstandardgrade', get_string('grade'));
+                $mform->addElement('header', 'modstandardgrade', get_string('gradenoun'));
             }
 
             //if supports grades and grades arent being handled via ratings
@@ -998,7 +1012,7 @@ abstract class moodleform_mod extends moodleform {
                     $gradeoptions['hasgrades'] = $gradeitem->has_grades();
                 }
             }
-            $mform->addElement('modgrade', $gradefieldname, get_string('grade'), $gradeoptions);
+            $mform->addElement('modgrade', $gradefieldname, get_string('gradenoun'), $gradeoptions);
             $mform->addHelpButton($gradefieldname, 'modgrade', 'grades');
             $mform->setDefault($gradefieldname, $CFG->gradepointdefault);
 
@@ -1256,6 +1270,11 @@ abstract class moodleform_mod extends moodleform {
             // they can be added to the DB.
             if (isset($data->gradepass)) {
                 $data->gradepass = unformat_float($data->gradepass);
+            }
+
+            // Trim name for all activity name.
+            if (isset($data->name)) {
+                $data->name = trim($data->name);
             }
 
             $this->data_postprocessing($data);

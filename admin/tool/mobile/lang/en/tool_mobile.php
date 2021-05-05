@@ -64,7 +64,7 @@ $string['downloadcourses'] = 'Download courses';
 $string['enablesmartappbanners'] = 'Enable App Banners';
 $string['enablesmartappbanners_desc'] = 'If enabled, a banner promoting the mobile app will be displayed when accessing the site using a mobile browser.';
 $string['filetypeexclusionlist'] = 'File type exclusion list';
-$string['filetypeexclusionlist_desc'] = 'List of file types that we don\'t want users to try and open in the app. These files will still be listed on the app\'s course screen, but attempting to open them on iOS or Android would display a warning to the user indicating that this file type is not intended for use on a mobile device. They can then either cancel the open, or ignore the warning and open anyway.';
+$string['filetypeexclusionlist_desc'] = 'Select all file types which are not for use on a mobile device. Such files will be listed in the course, then if a user attempts to open them, a warning will be displayed advising that the file type is not intended for use on a mobile device. The user can then cancel or ignore the warning and open the file anyway.';
 $string['filetypeexclusionlistplaceholder'] = 'Mobile file type exclusion list';
 $string['forcedurlscheme'] = 'If you want to allow only your custom branded app to be opened via a browser window, then specify its URL scheme here. If you want to allow only the official app, then set the default value. Leave the field empty if you want to allow any app.';
 $string['forcedurlscheme_key'] = 'URL scheme';
@@ -80,15 +80,16 @@ $string['invalidprivatetoken'] = 'Invalid private token. Token should not be emp
 $string['invaliduserquotawarning'] = 'The user quota (userquota) is set to an invalid number. It should be set to a valid number (an integer value) in Site security settings.';
 $string['iosappid'] = 'iOS app\'s unique identifier';
 $string['iosappid_desc'] = 'This setting may be left as default unless you have a custom iOS app.';
+$string['launchviasiteinbrowser'] = 'Launch via site in system browser';
 $string['loginintheapp'] = 'Via the app';
 $string['logininthebrowser'] = 'Via a browser window (for SSO plugins)';
 $string['loginintheembeddedbrowser'] = 'Via an embedded browser (for SSO plugins)';
+$string['logoutconfirmation'] = 'Are you sure you want to log out from the mobile app on your mobile devices? By logging out, you will then need to re-enter your username and password in the mobile app on all devices where you have the app installed.';
 $string['mainmenu'] = 'Main menu';
 $string['managefiletypes'] = 'Manage file types';
 $string['minimumversion'] = 'If an app version is specified (3.8.0 or higher), any users using an older app version will be prompted to upgrade their app before being allowed access to the site.';
 $string['minimumversion_key'] = 'Minimum app version required';
 $string['mobileapp'] = 'Mobile app';
-$string['mobileappconnected'] = 'Mobile app connected';
 $string['mobileappenabled'] = 'This site has mobile app access enabled.<br /><a href="{$a}">Download the mobile app</a>.';
 $string['mobileappearance'] = 'Mobile appearance';
 $string['mobileappsubscription'] = 'Moodle app subscription';
@@ -109,7 +110,6 @@ $string['notificationssentnotifications'] = 'Notifications sent';
 $string['notificationscurrentactivedevices'] = 'Devices receiving notifications this month';
 $string['oauth2identityproviders'] = 'OAuth 2 identity providers';
 $string['offlineuse'] = 'Offline use';
-$string['openusingembeddedbrowser'] = 'Open using embedded browser';
 $string['pluginname'] = 'Moodle app tools';
 $string['pluginnotenabledorconfigured'] = 'Plugin not enabled or configured.';
 $string['qrcodedisabled'] = 'Access via QR code disabled';
@@ -144,3 +144,9 @@ $string['privacy:metadata:preference:tool_mobile_autologin_request_last'] = 'The
 $string['privacy:metadata:core_userkey'] = 'User\'s keys used to create auto-login key for the current user.';
 $string['responsivemainmenuitems'] = 'Responsive menu items';
 $string['viewqrcode'] = 'View QR code';
+
+// Deprecated since Moodle 3.10.
+$string['mobileappconnected'] = 'Mobile app connected';
+
+// Deprecated since Moodle 3.11.
+$string['openusingembeddedbrowser'] = 'Open using embedded browser';

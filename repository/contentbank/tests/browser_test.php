@@ -43,7 +43,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
      * the system context.
      */
     public function test_get_content_system_context_user_has_capabilities() {
-        global $DB;
+        global $DB, $CFG;
 
         $this->resetAfterTest(true);
 
@@ -66,8 +66,9 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // Add some content to the content bank.
         $generator = $this->getDataGenerator()->get_plugin_generator('core_contentbank');
         // Add some content bank files in the system context.
+        $filepath = $CFG->dirroot . '/h5p/tests/fixtures/filltheblanks.h5p';
         $contentbankcontents = $generator->generate_contentbank_data('contenttype_h5p', 3, $admin->id,
-            $systemcontext, true);
+            $systemcontext, true, $filepath);
 
         // Log in as admin.
         $this->setUser($admin);
@@ -89,7 +90,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
             ]
         ];
         $expected = $this->generate_expected_content($contextfolders, $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontentnodes, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontentnodes);
 
         // Log in as a user.
         $this->setUser($user);
@@ -101,7 +102,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // the content of the category's courses.
         $this->assertCount(3, $repositorycontentnodes);
         $expected = $this->generate_expected_content([], $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontentnodes, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontentnodes);
 
         // Enrol the user as an editing teacher in the course.
         $editingteacherrole = $DB->get_field('role', 'id', ['shortname' => 'editingteacher']);
@@ -122,7 +123,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
             ]
         ];
         $expected = $this->generate_expected_content($contextfolders, $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontentnodes, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontentnodes);
     }
 
     /**
@@ -156,6 +157,8 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
      * any category course should be able to access/view the content in the course category context.
      */
     public function test_get_content_course_category_context_user_has_capabilities() {
+        global $CFG;
+
         $this->resetAfterTest(true);
 
         // Create a course category.
@@ -175,8 +178,9 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // Add some content to the content bank.
         $generator = $this->getDataGenerator()->get_plugin_generator('core_contentbank');
         // Add some content bank files in the course category context.
+        $filepath = $CFG->dirroot . '/h5p/tests/fixtures/filltheblanks.h5p';
         $contentbankcontents = $generator->generate_contentbank_data('contenttype_h5p', 3, $admin->id,
-            $coursecatcontext, true);
+            $coursecatcontext, true, $filepath);
 
         $this->setUser($admin);
         // Get the content bank nodes displayed to the admin in the course category context.
@@ -197,7 +201,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
             ]
         ];
         $expected = $this->generate_expected_content($contextfolders, $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontents, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontents);
 
         // Log in as an editing teacher enrolled in a child course.
         $this->setUser($editingteacher);
@@ -215,7 +219,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
             ]
         ];
         $expected = $this->generate_expected_content($contextfolders, $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontents, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontents);
     }
 
     /**
@@ -277,6 +281,8 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
      * in the course should be able to access/view the content.
      */
     public function test_get_content_course_context_user_has_capabilities() {
+        global $CFG;
+
         $this->resetAfterTest(true);
 
         // Create course1.
@@ -290,8 +296,9 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // Add some content to the content bank.
         $generator = $this->getDataGenerator()->get_plugin_generator('core_contentbank');
         // Add some content bank files in the course context.
+        $filepath = $CFG->dirroot . '/h5p/tests/fixtures/filltheblanks.h5p';
         $contentbankcontents = $generator->generate_contentbank_data('contenttype_h5p', 3, $admin->id,
-            $coursecontext, true);
+            $coursecontext, true, $filepath);
 
         $this->setUser($admin);
         // Get the content bank nodes displayed to the admin in the course context.
@@ -302,7 +309,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // course context.
         $this->assertCount(3, $repositorycontents);
         $expected = $this->generate_expected_content([], $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontents, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontents);
 
         // Log in as an editing teacher.
         $this->setUser($editingteacher);
@@ -314,7 +321,7 @@ class repository_contentbank_browser_testcase extends advanced_testcase {
         // course context.
         $this->assertCount(3, $repositorycontents);
         $expected = $this->generate_expected_content([], $contentbankcontents);
-        $this->assertEquals($expected, $repositorycontents, '', 0.0, 10, true);
+        $this->assertEqualsCanonicalizing($expected, $repositorycontents);
     }
 
     /**

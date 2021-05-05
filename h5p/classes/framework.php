@@ -115,7 +115,16 @@ class framework implements \H5PFrameworkInterface {
      * @param string $url
      */
     public function setLibraryTutorialUrl($libraryname, $url) {
-        // Tutorial url is currently not being used or stored in libraries.
+        global $DB;
+
+        $sql = 'UPDATE {h5p_libraries}
+                   SET tutorial = :tutorial
+                 WHERE machinename = :machinename';
+        $params = [
+            'tutorial' => $url,
+            'machinename' => $libraryname,
+        ];
+        $DB->execute($sql, $params);
     }
 
     /**
@@ -511,7 +520,7 @@ class framework implements \H5PFrameworkInterface {
 
         $results = $DB->get_records('h5p_libraries', [], 'title ASC, majorversion ASC, minorversion ASC',
             'id, machinename AS machine_name, majorversion AS major_version, minorversion AS minor_version,
-            patchversion AS patch_version, runnable, title');
+            patchversion AS patch_version, runnable, title, enabled');
 
         $libraries = array();
         foreach ($results as $library) {
@@ -568,7 +577,7 @@ class framework implements \H5PFrameworkInterface {
     }
 
     /**
-     * Get file extension whitelist.
+     * Get allowed file extension list.
      * Implements getWhitelist.
      *
      * The default extension list is part of h5p, but admins should be allowed to modify it.
@@ -1093,20 +1102,10 @@ class framework implements \H5PFrameworkInterface {
      * @param int $minorversion The library's minor version
      */
     public function alterLibrarySemantics(&$semantics, $name, $majorversion, $minorversion) {
-        global $DB;
+        global $PAGE;
 
-        $library = $DB->get_record('h5p_libraries',
-            array(
-                'machinename' => $name,
-                'majorversion' => $majorversion,
-                'minorversion' => $minorversion,
-            )
-        );
-
-        if ($library) {
-            $library->semantics = json_encode($semantics);
-            $DB->update_record('h5p_libraries', $library);
-        }
+        $renderer = $PAGE->get_renderer('core_h5p');
+        $renderer->h5p_alter_semantics($semantics, $name, $majorversion, $minorversion);
     }
 
     /**

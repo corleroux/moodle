@@ -33,6 +33,7 @@ CVS
 /.project
 /.buildpath
 /.cache
+.phpunit.result.cache
 phpunit.xml
 # Composer support. Do not ignore composer.json, or composer.lock. These should be shipped by us.
 composer.phar
@@ -45,3 +46,4 @@ composer.phar
 atlassian-ide-plugin.xml
 /node_modules/
 /.vscode/
+moodle-plugin-ci.phar

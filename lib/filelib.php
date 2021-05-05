@@ -2234,21 +2234,25 @@ function readfile_accel($file, $mimetype, $accelerate) {
         }
     }
 
-    if ($filesize > 10000000) {
-        // for large files try to flush and close all buffers to conserve memory
-        while(@ob_get_level()) {
-            if (!@ob_end_flush()) {
-                break;
-            }
-        }
-    }
-
-    // Send this header after we have flushed the buffers so that if we fail
-    // later can remove this because it wasn't sent.
     header('Content-Length: ' . $filesize);
 
     if (!empty($_SERVER['REQUEST_METHOD']) and $_SERVER['REQUEST_METHOD'] === 'HEAD') {
         exit;
+    }
+
+    while (ob_get_level()) {
+        $handlerstack = ob_list_handlers();
+        $activehandler = array_pop($handlerstack);
+        if ($activehandler === 'default output handler') {
+            // We do not expect any content in the buffer when we are serving files.
+            $buffercontents = ob_get_clean();
+            if ($buffercontents !== '') {
+                error_log('Non-empty default output handler buffer detected while serving the file ' . $file);
+            }
+        } else {
+            // Some handlers such as zlib output compression may have file signature buffered - flush it.
+            ob_end_flush();
+        }
     }
 
     // send the whole file content
@@ -3018,7 +3022,7 @@ class curl {
     private $cookie   = false;
     /** @var bool tracks multiple headers in response - redirect detection */
     private $responsefinished = false;
-    /** @var security helper class, responsible for checking host/ports against blacklist/whitelist entries.*/
+    /** @var security helper class, responsible for checking host/ports against allowed/blocked entries.*/
     private $securityhelper;
     /** @var bool ignoresecurity a flag which can be supplied to the constructor, allowing security to be bypassed. */
     private $ignoresecurity;
@@ -3564,6 +3568,51 @@ class curl {
     }
 
     /**
+     * check_securityhelper_blocklist.
+     * Checks whether the given URL is blocked by checking both plugin's security helpers
+     * and core curl security helper or any curl security helper that passed to curl class constructor.
+     * If ignoresecurity is set to true, skip checking and consider the url is not blocked.
+     * This augments all installed plugin's security helpers if there is any.
+     *
+     * @param string $url the url to check.
+     * @return string - an error message if URL is blocked or null if URL is not blocked.
+     */
+    protected function check_securityhelper_blocklist(string $url): ?string {
+
+        // If curl security is not enabled, do not proceed.
+        if ($this->ignoresecurity) {
+            return null;
+        }
+
+        // Augment all installed plugin's security helpers if there is any.
+        // The plugin's function has to be defined as plugintype_pluginname_curl_security_helper in pluginname/lib.php.
+        $plugintypes = get_plugins_with_function('curl_security_helper');
+
+        // If any of the security helper's function returns true, treat as URL is blocked.
+        foreach ($plugintypes as $plugins) {
+            foreach ($plugins as $pluginfunction) {
+                // Get curl security helper object from plugin lib.php.
+                $pluginsecurityhelper = $pluginfunction();
+                if ($pluginsecurityhelper instanceof \core\files\curl_security_helper_base) {
+                    if ($pluginsecurityhelper->url_is_blocked($url)) {
+                        $this->error = $pluginsecurityhelper->get_blocked_url_string();
+                        return $this->error;
+                    }
+                }
+            }
+        }
+
+        // Check if the URL is blocked in core curl_security_helper or
+        // curl security helper that passed to curl class constructor.
+        if ($this->securityhelper->url_is_blocked($url)) {
+            $this->error = $this->securityhelper->get_blocked_url_string();
+            return $this->error;
+        }
+
+        return null;
+    }
+
+    /**
      * Single HTTP Request
      *
      * @param string $url The URL to request
@@ -3571,7 +3620,7 @@ class curl {
      * @return bool
      */
     protected function request($url, $options = array()) {
-        // Reset here so that the data is valid when result returned from cache, or if we return due to a blacklist hit.
+        // Reset here so that the data is valid when result returned from cache, or if we return due to a blocked URL hit.
         $this->reset_request_state_vars();
 
         if ((defined('PHPUNIT_TEST') && PHPUNIT_TEST)) {
@@ -3581,11 +3630,10 @@ class curl {
             }
         }
 
-        // If curl security is enabled, check the URL against the blacklist before calling curl_exec.
-        // Note: This will only check the base url. In the case of redirects, the blacklist is also after the curl_exec.
-        if (!$this->ignoresecurity && $this->securityhelper->url_is_blocked($url)) {
-            $this->error = $this->securityhelper->get_blocked_url_string();
-            return $this->error;
+        // This will only check the base url. In the case of redirects, the blocking check is also after the curl_exec.
+        $urlisblocked = $this->check_securityhelper_blocklist($url);
+        if (!is_null($urlisblocked)) {
+            return $urlisblocked;
         }
 
         // Set the URL as a curl option.
@@ -3605,13 +3653,14 @@ class curl {
         $this->errno = curl_errno($curl);
         // Note: $this->response and $this->rawresponse are filled by $hits->formatHeader callback.
 
-        // In the case of redirects (which curl blindly follows), check the post-redirect URL against the blacklist entries too.
-        if (intval($this->info['redirect_count']) > 0 && !$this->ignoresecurity
-            && $this->securityhelper->url_is_blocked($this->info['url'])) {
-            $this->reset_request_state_vars();
-            $this->error = $this->securityhelper->get_blocked_url_string();
-            curl_close($curl);
-            return $this->error;
+        // In the case of redirects (which curl blindly follows), check the post-redirect URL against the list of blocked list too.
+        if (intval($this->info['redirect_count']) > 0) {
+            $urlisblocked = $this->check_securityhelper_blocklist($this->info['url']);
+            if (!is_null($urlisblocked)) {
+                $this->reset_request_state_vars();
+                curl_close($curl);
+                return $urlisblocked;
+            }
         }
 
         if ($this->emulateredirects and $this->options['CURLOPT_FOLLOWLOCATION'] and $this->info['http_code'] != 200) {

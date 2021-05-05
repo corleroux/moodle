@@ -96,6 +96,7 @@ class core_component {
         'MoodleHQ\\RTLCSS' => 'lib/rtlcss',
         'ScssPhp\\ScssPhp' => 'lib/scssphp',
         'Box\\Spout' => 'lib/spout/src/Spout',
+        'BirknerAlex\\XMPPHP' => 'lib/jabber/XMPP',
         'MatthiasMullie\\Minify' => 'lib/minify/matthiasmullie-minify/src/',
         'MatthiasMullie\\PathConverter' => 'lib/minify/matthiasmullie-pathconverter/src/',
         'IMSGlobal\LTI' => 'lib/ltiprovider/src',
@@ -733,7 +734,7 @@ $cache = '.var_export($cache, true).';
     /**
      * List all core subsystems and their location
      *
-     * This is a whitelist of components that are part of the core and their
+     * This is a list of components that are part of the core and their
      * language strings are defined in /lang/en/<<subsystem>>.php. If a given
      * plugin is not listed here and it does not have proper plugintype prefix,
      * then it is considered as course activity module.

@@ -69,7 +69,6 @@ class core_user {
         'country',
         'lang',
         'description',
-        'url',
         'idnumber',
         'institution',
         'department',
@@ -251,25 +250,11 @@ class core_user {
         $extrasql = '';
         $extraparams = [];
 
-        if (empty($CFG->showuseridentity)) {
-            // Explode gives wrong result with empty string.
-            $extra = [];
-        } else {
-            $extra = explode(',', $CFG->showuseridentity);
-        }
-
-        // We need the username just to skip guests.
-        $extrafieldlist = $extra;
-        if (!in_array('username', $extra)) {
-            $extrafieldlist[] = 'username';
-        }
-        // The deleted flag will always be false because users_search_sql excludes deleted users,
-        // but it must be present or it causes PHP warnings in some functions below.
-        if (!in_array('deleted', $extra)) {
-            $extrafieldlist[] = 'deleted';
-        }
-        $selectfields = \user_picture::fields('u',
-                array_merge(get_all_user_name_fields(), $extrafieldlist));
+        // TODO Does not support custom user profile fields (MDL-70456).
+        $userfieldsapi = \core_user\fields::for_identity(null, false)->with_userpic()->with_name()
+            ->including('username', 'deleted');
+        $selectfields = $userfieldsapi->get_sql('u', false, '', '', false)->selects;
+        $extra = $userfieldsapi->get_required_fields([\core_user\fields::PURPOSE_IDENTITY]);
 
         $index = 1;
         foreach ($extra as $fieldname) {
@@ -601,33 +586,35 @@ class core_user {
             // The user has chosen to delete the selected users picture.
             $fs->delete_area_files($context->id, 'user', 'icon'); // Drop all images in area.
             $newpicture = 0;
+        }
 
-        } else {
-            // Save newly uploaded file, this will avoid context mismatch for newly created users.
-            file_save_draft_area_files($usernew->imagefile, $context->id, 'user', 'newicon', 0, $filemanageroptions);
-            if (($iconfiles = $fs->get_area_files($context->id, 'user', 'newicon')) && count($iconfiles) == 2) {
-                // Get file which was uploaded in draft area.
-                foreach ($iconfiles as $file) {
-                    if (!$file->is_directory()) {
-                        break;
-                    }
+        // Save newly uploaded file, this will avoid context mismatch for newly created users.
+        if (!isset($usernew->imagefile)) {
+            $usernew->imagefile = 0;
+        }
+        file_save_draft_area_files($usernew->imagefile, $context->id, 'user', 'newicon', 0, $filemanageroptions);
+        if (($iconfiles = $fs->get_area_files($context->id, 'user', 'newicon')) && count($iconfiles) == 2) {
+            // Get file which was uploaded in draft area.
+            foreach ($iconfiles as $file) {
+                if (!$file->is_directory()) {
+                    break;
                 }
-                // Copy file to temporary location and the send it for processing icon.
-                if ($iconfile = $file->copy_content_to_temp()) {
-                    // There is a new image that has been uploaded.
-                    // Process the new image and set the user to make use of it.
-                    // NOTE: Uploaded images always take over Gravatar.
-                    $newpicture = (int)process_new_icon($context, 'user', 'icon', 0, $iconfile);
-                    // Delete temporary file.
-                    @unlink($iconfile);
-                    // Remove uploaded file.
-                    $fs->delete_area_files($context->id, 'user', 'newicon');
-                } else {
-                    // Something went wrong while creating temp file.
-                    // Remove uploaded file.
-                    $fs->delete_area_files($context->id, 'user', 'newicon');
-                    return false;
-                }
+            }
+            // Copy file to temporary location and the send it for processing icon.
+            if ($iconfile = $file->copy_content_to_temp()) {
+                // There is a new image that has been uploaded.
+                // Process the new image and set the user to make use of it.
+                // NOTE: Uploaded images always take over Gravatar.
+                $newpicture = (int)process_new_icon($context, 'user', 'icon', 0, $iconfile);
+                // Delete temporary file.
+                @unlink($iconfile);
+                // Remove uploaded file.
+                $fs->delete_area_files($context->id, 'user', 'newicon');
+            } else {
+                // Something went wrong while creating temp file.
+                // Remove uploaded file.
+                $fs->delete_area_files($context->id, 'user', 'newicon');
+                return false;
             }
         }
 
@@ -681,11 +668,6 @@ class core_user {
         $fields['surname'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
         $fields['email'] = array('type' => PARAM_RAW_TRIMMED, 'null' => NULL_NOT_ALLOWED);
         $fields['emailstop'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 0);
-        $fields['icq'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
-        $fields['skype'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED);
-        $fields['aim'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
-        $fields['yahoo'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
-        $fields['msn'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
         $fields['phone1'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
         $fields['phone2'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
         $fields['institution'] = array('type' => PARAM_TEXT, 'null' => NULL_NOT_ALLOWED);
@@ -708,9 +690,8 @@ class core_user {
         $fields['lastlogin'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
         $fields['currentlogin'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
         $fields['lastip'] = array('type' => PARAM_NOTAGS, 'null' => NULL_NOT_ALLOWED);
-        $fields['secret'] = array('type' => PARAM_RAW, 'null' => NULL_NOT_ALLOWED);
+        $fields['secret'] = array('type' => PARAM_ALPHANUM, 'null' => NULL_NOT_ALLOWED);
         $fields['picture'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
-        $fields['url'] = array('type' => PARAM_URL, 'null' => NULL_NOT_ALLOWED);
         $fields['description'] = array('type' => PARAM_RAW, 'null' => NULL_ALLOWED);
         $fields['descriptionformat'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED);
         $fields['mailformat'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED,
@@ -966,8 +947,6 @@ class core_user {
                 return ($USER->id != $user->id && (has_capability('moodle/user:update', $systemcontext) ||
                         ($user->timecreated > time() - 10 && has_capability('moodle/user:create', $systemcontext))));
             });
-        $preferences['usemodchooser'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 1,
-            'choices' => array(0, 1));
         $preferences['forum_markasreadonnotification'] = array('type' => PARAM_INT, 'null' => NULL_NOT_ALLOWED, 'default' => 1,
             'choices' => array(0, 1));
         $preferences['htmleditor'] = array('type' => PARAM_NOTAGS, 'null' => NULL_ALLOWED,

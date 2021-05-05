@@ -593,8 +593,8 @@ class mod_assign_external extends external_api {
         return new external_single_structure(
             array(
                 'id' => new external_value(PARAM_INT, 'course id'),
-                'fullname' => new external_value(PARAM_TEXT, 'course full name'),
-                'shortname' => new external_value(PARAM_TEXT, 'course short name'),
+                'fullname' => new external_value(PARAM_RAW, 'course full name'),
+                'shortname' => new external_value(PARAM_RAW, 'course short name'),
                 'timemodified' => new external_value(PARAM_INT, 'last time modified'),
                 'assignments' => new external_multiple_structure(self::get_assignments_assignment_structure(), 'assignment info')
               ), 'course information object'
@@ -2080,7 +2080,7 @@ class mod_assign_external extends external_api {
      * @return null
      * @since Moodle 2.7
      */
-    public static function save_grades($assignmentid, $applytoall = false, $grades) {
+    public static function save_grades($assignmentid, $applytoall, $grades) {
         global $CFG, $USER;
 
         $params = self::validate_parameters(self::save_grades_parameters(),
@@ -2375,7 +2375,8 @@ class mod_assign_external extends external_api {
         }
 
         // Retrieve the rest of the renderable objects.
-        if (has_capability('mod/assign:submit', $assign->get_context(), $user)) {
+        if (has_capability('mod/assign:viewownsubmissionsummary', $context, $user, false)) {
+            // The user can view the submission summary.
             $lastattempt = $assign->get_assign_submission_status_renderable($user, true);
         }
 
@@ -2431,7 +2432,8 @@ class mod_assign_external extends external_api {
             }
 
             // Can edit its own submission?
-            $lastattempt->caneditowner = $assign->submissions_open($user->id) && $assign->is_any_submission_plugin_enabled();
+            $lastattempt->caneditowner = has_capability('mod/assign:submit', $context, $user, false)
+                && $assign->submissions_open($user->id) && $assign->is_any_submission_plugin_enabled();
 
             $result['lastattempt'] = $lastattempt;
         }
